@@ -1,68 +1,66 @@
-import { useEffect, useState } from 'react'
-  import * as signalR from '@microsoft/signalr'
-  
-  
-  export default function chat() {
-      
-    const [messages,setMessages] = useState([])
-  
-      useEffect(() => {
-  
-        const conexion = new signalR.HubConnectionBuilder()
-        .withUrl('url')
-        .build()
-  
-        conexion.on('histoy messages', (user,message) => {
-          setMessages([...message, {user, message}]);
-        })
-  
-        conexion.start()
-        .then(() => {
-            console.log("canal conectado")
-        })
-        .catch(() => {
-            console.log("error al conectar")
-        })
-  
-        return () => {
-          conexion.stop()
-        }
-      },[messages])
-  
-  
-      const handleMessage = async () => {
-        const user = prompt("Ingrese su usuario")
-        const msg = prompt("ingrese msg")
+import { useState } from 'react';
+import { HubConnectionBuilder, LogLevel } from '@microsoft/signalr';
+import Lobby from './components/Lobby';
+import Chat from './components/Chat';
+import 'bootstrap/dist/css/bootstrap.min.css';
 
-  
-        if (msg?.length > 0 && user?.length > 0) {
-            await conexion.invoke('new message', user, msg)
-            setMessages([...messages,{user, msg}])
-        } else {
-          setMessages([{user: "no ingreso usuario", message: "no ingreso"}])
-        }
-      } 
-  
-      
-      
-    
-    
-    return (
-      <>
-        <button onClick={() => handleMessage()}>Conectar</button>
+const chat = () => {
+  const [connection, setConnection] = useState();
+  const [messages, setMessages] = useState([]);
+  const [users, setUsers] = useState([]);
 
-        <div>
-          <h1>Messages</h1>
-          {
-          messages.map((message) => {
-            <>
-              <h3>{message.user};</h3>
-              <strong>{message.message}</strong>
-            </>
-          })
-        }
-        </div>
-      </>
-    )
+  const joinRoom = async (user, room) => {
+    try {
+      const connection = new HubConnectionBuilder()
+        .withUrl("https://localhost:7077/chat")
+        .configureLogging(LogLevel.Information)
+        .build();
+
+      connection.on("ReceiveMessage", (user, message) => {
+        setMessages(messages => [...messages, { user, message }]);
+      });
+
+      connection.on("UsersInRoom", (users) => {
+        setUsers(users);
+      });
+
+      connection.onclose(e => {
+        setConnection();
+        setMessages([]);
+        setUsers([]);
+      });
+
+      await connection.start();
+      await connection.invoke("JoinRoom", { user, room });
+      setConnection(connection);
+    } catch (e) {
+      console.log(e);
+    }
   }
-  
+
+  const sendMessage = async (message) => {
+    try {
+      await connection.invoke("SendMessage", message);
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
+  const closeConnection = async () => {
+    try {
+      await connection.stop();
+    } catch (e) {
+      console.log(e);
+    }
+  }
+
+  return <div className='app'>
+    <h2>MyChat</h2>
+    <hr className='line' />
+    {!connection
+      ? <Lobby joinRoom={joinRoom} />
+      : <Chat sendMessage={sendMessage} messages={messages} users={users} closeConnection={closeConnection} />}
+  </div>
+}
+
+export default chat;
