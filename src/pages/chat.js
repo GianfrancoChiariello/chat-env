@@ -35,9 +35,11 @@ import { useEffect, useState } from 'react'
         const msg = prompt("ingrese msg")
 
   
-        if (msg.length > 0 && user.length > 0) {
+        if (msg?.length > 0 && user?.length > 0) {
             await conexion.invoke('new message', user, msg)
             setMessages([...messages,{user, msg}])
+        } else {
+          setMessages([{user: "no ingreso usuario", message: "no ingreso"}])
         }
       } 
   
